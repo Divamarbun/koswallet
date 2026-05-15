@@ -1,26 +1,40 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./supabase";
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer
-} from "recharts";
-import {
-  Wallet, Home, BarChart2, Target, Sparkles, Plus, X,
-  ArrowDownCircle, ArrowUpCircle, FileText, Loader2
-} from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { Wallet, Home, BarChart2, Target, Sparkles, Plus, X, ArrowDownCircle, ArrowUpCircle, FileText, Loader2, Trash2 } from "lucide-react";
 
 const CATEGORIES = ["Makan & Minum","Kos & Listrik","Transport","Hiburan","Belanja","Pendidikan","Kiriman","Lainnya"];
 const CAT_EMOJI  = { "Makan & Minum":"🍜","Kos & Listrik":"🏠","Transport":"🚌","Hiburan":"🎮","Belanja":"🛍️","Pendidikan":"📚","Kiriman":"💸","Lainnya":"📌" };
 const CAT_COLOR  = { "Makan & Minum":"#f97066","Kos & Listrik":"#a78bfa","Transport":"#fbbf24","Hiburan":"#f472b6","Belanja":"#60a5fa","Pendidikan":"#34d399","Kiriman":"#4fd1a5","Lainnya":"#8884a8" };
 const SAVING_EMOJIS = ["💻","✈️","🏠","📱","🎓","🏍️","💪","🎯"];
-const MONTHLY_HISTORY = [
-  { m:"Agu", inc:1200000, exp:980000 },
-  { m:"Sep", inc:1500000, exp:1100000 },
-  { m:"Okt", inc:1300000, exp:1050000 },
-  { m:"Nov", inc:1800000, exp:1200000 },
-  { m:"Des", inc:1400000, exp:1350000 },
-];
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
 
 const fmt = n => "Rp " + Math.round(n).toLocaleString("id-ID");
+
+// Kelompokkan transaksi per bulan
+function groupByMonth(txs) {
+  const map = {};
+  txs.forEach(t => {
+    const d = new Date(t.date);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+    if (!map[key]) map[key] = { m: MONTH_NAMES[d.getMonth()], inc: 0, exp: 0, year: d.getFullYear(), month: d.getMonth() };
+    if (t.type === "income") map[key].inc += t.amount;
+    else map[key].exp += t.amount;
+  });
+  return Object.entries(map)
+    .sort((a,b) => a[0].localeCompare(b[0]))
+    .map(([,v]) => v)
+    .slice(-6); // tampilkan 6 bulan terakhir
+}
+
+// Transaksi bulan ini saja
+function currentMonthTxs(txs) {
+  const now = new Date();
+  return txs.filter(t => {
+    const d = new Date(t.date);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+}
 
 const S = {
   app: { background:"#0f0f13", minHeight:"100vh", color:"#f0effe", fontFamily:"'Segoe UI', system-ui, sans-serif" },
@@ -59,6 +73,7 @@ const S = {
   bottomNav: { position:"fixed", bottom:0, left:0, right:0, background:"#1a1a24", borderTop:"1px solid rgba(255,255,255,0.08)", display:"flex", justifyContent:"space-around", padding:"10px 0 14px" },
   navBtn: (active) => ({ background:"none", border:"none", color:active?"#7c6af7":"#8884a8", display:"flex", flexDirection:"column", alignItems:"center", gap:3, fontSize:10, cursor:"pointer", fontWeight:active?600:400 }),
   loadingWrap: { display:"flex", alignItems:"center", justifyContent:"center", padding:"40px 0", color:"#8884a8", gap:8, fontSize:14 },
+  deleteBtn: { background:"none", border:"none", color:"#8884a8", cursor:"pointer", padding:4, borderRadius:6, display:"flex", alignItems:"center" },
 };
 
 function TxModal({ onClose, onSave }) {
@@ -158,14 +173,18 @@ function SavingModal({ onClose, onSave }) {
   );
 }
 
-function HomeView({ txs, loading, onAdd }) {
-  const inc = txs.filter(t=>t.type==="income").reduce((a,t)=>a+t.amount,0);
-  const exp = txs.filter(t=>t.type==="expense").reduce((a,t)=>a+t.amount,0);
+function HomeView({ txs, loading, onAdd, onDelete }) {
+  const now = new Date();
+  const bulanIni = MONTH_NAMES[now.getMonth()] + " " + now.getFullYear();
+  const thisTxs = currentMonthTxs(txs);
+  const inc = thisTxs.filter(t=>t.type==="income").reduce((a,t)=>a+t.amount,0);
+  const exp = thisTxs.filter(t=>t.type==="expense").reduce((a,t)=>a+t.amount,0);
   const recent = [...txs].slice(0,6);
+
   return (
     <>
       <div style={S.balCard}>
-        <div style={S.balLabel}>Saldo Bulan Ini</div>
+        <div style={S.balLabel}>Saldo {bulanIni}</div>
         <div style={S.balAmt}>{fmt(inc-exp)}</div>
         <div style={S.balRow}>
           <div style={S.balSub}>
@@ -191,11 +210,14 @@ function HomeView({ txs, loading, onAdd }) {
                   </div>
                   <div style={{flex:1}}>
                     <div style={{fontSize:14,fontWeight:500}}>{t.desc}</div>
-                    <div style={{fontSize:12,color:"#8884a8",marginTop:2}}>{t.cat}</div>
+                    <div style={{fontSize:12,color:"#8884a8",marginTop:2}}>{t.cat} · {t.date}</div>
                   </div>
-                  <div style={{fontSize:14,fontWeight:600,color:t.type==="income"?"#4fd1a5":"#f97066"}}>
+                  <div style={{fontSize:14,fontWeight:600,color:t.type==="income"?"#4fd1a5":"#f97066",marginRight:8}}>
                     {t.type==="income"?"+":"-"}{fmt(t.amount)}
                   </div>
+                  <button style={S.deleteBtn} onClick={()=>onDelete(t.id)} title="Hapus">
+                    <Trash2 size={15} color="#f97066"/>
+                  </button>
                 </div>
               ))
             }
@@ -207,58 +229,67 @@ function HomeView({ txs, loading, onAdd }) {
 }
 
 function ChartView({ txs }) {
-  const inc = txs.filter(t=>t.type==="income").reduce((a,t)=>a+t.amount,0);
-  const exp = txs.filter(t=>t.type==="expense").reduce((a,t)=>a+t.amount,0);
-  const chartData = [...MONTHLY_HISTORY, { m:"Jan", inc, exp }];
+  const chartData = groupByMonth(txs);
+  const thisTxs = currentMonthTxs(txs);
   const cats = {};
-  txs.filter(t=>t.type==="expense").forEach(t=>{ cats[t.cat]=(cats[t.cat]||0)+t.amount; });
+  thisTxs.filter(t=>t.type==="expense").forEach(t=>{ cats[t.cat]=(cats[t.cat]||0)+t.amount; });
   const total = Object.values(cats).reduce((a,v)=>a+v,0)||1;
   const sorted = Object.entries(cats).sort((a,b)=>b[1]-a[1]);
 
   const exportTxt = () => {
+    const inc = thisTxs.filter(t=>t.type==="income").reduce((a,t)=>a+t.amount,0);
+    const exp = thisTxs.filter(t=>t.type==="expense").reduce((a,t)=>a+t.amount,0);
+    const now = new Date();
     const lines = [
       "RINGKASAN KEUANGAN — KOSWALLET","=".repeat(38),
+      `Bulan: ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`,
       `Pemasukan : ${fmt(inc)}`,`Pengeluaran: ${fmt(exp)}`,`Saldo      : ${fmt(inc-exp)}`,"",
-      "TRANSAKSI:",
-      ...txs.map(t=>`[${t.type==="income"?"IN":"OUT"}] ${t.desc} — ${fmt(t.amount)} | ${t.cat}`),
-      "",`Digenerate: ${new Date().toLocaleString("id-ID")}`,
+      "TRANSAKSI BULAN INI:",
+      ...thisTxs.map(t=>`[${t.type==="income"?"IN":"OUT"}] ${t.desc} — ${fmt(t.amount)} | ${t.cat} | ${t.date}`),
+      "",`Digenerate: ${now.toLocaleString("id-ID")}`,
     ].join("\n");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([lines],{type:"text/plain"}));
-    a.download = "KosWallet_Ringkasan.txt";
+    a.download = `KosWallet_${MONTH_NAMES[now.getMonth()]}_${now.getFullYear()}.txt`;
     a.click();
   };
 
   return (
     <>
-      <p style={S.sectionTitle}>Arus Kas 6 Bulan</p>
+      <p style={S.sectionTitle}>Arus Kas per Bulan</p>
       <div style={S.card}>
-        <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={chartData} barGap={2}>
-            <XAxis dataKey="m" tick={{fontSize:11,fill:"#8884a8"}} axisLine={false} tickLine={false}/>
-            <YAxis hide/>
-            <Tooltip
-              formatter={(v,name)=>[fmt(v),name==="inc"?"Pemasukan":"Pengeluaran"]}
-              contentStyle={{background:"#1a1a24",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,fontSize:12}}
-              labelStyle={{color:"#f0effe"}}
-            />
-            <Bar dataKey="inc" fill="#4fd1a5" radius={[4,4,0,0]} maxBarSize={24}/>
-            <Bar dataKey="exp" fill="#f97066" radius={[4,4,0,0]} maxBarSize={24}/>
-          </BarChart>
-        </ResponsiveContainer>
-        <div style={{display:"flex",gap:16,justifyContent:"center",marginTop:4}}>
-          {[["#4fd1a5","Pemasukan"],["#f97066","Pengeluaran"]].map(([c,l])=>(
-            <span key={l} style={{fontSize:11,color:"#8884a8",display:"flex",alignItems:"center",gap:4}}>
-              <span style={{width:10,height:10,background:c,borderRadius:2,display:"inline-block"}}/>
-              {l}
-            </span>
-          ))}
-        </div>
+        {chartData.length === 0
+          ? <div style={{color:"#8884a8",fontSize:13,textAlign:"center",padding:"20px 0"}}>Belum ada data transaksi.</div>
+          : <>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={chartData} barGap={2}>
+                <XAxis dataKey="m" tick={{fontSize:11,fill:"#8884a8"}} axisLine={false} tickLine={false}/>
+                <YAxis hide/>
+                <Tooltip
+                  formatter={(v,name)=>[fmt(v),name==="inc"?"Pemasukan":"Pengeluaran"]}
+                  contentStyle={{background:"#1a1a24",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,fontSize:12}}
+                  labelStyle={{color:"#f0effe"}}
+                />
+                <Bar dataKey="inc" fill="#4fd1a5" radius={[4,4,0,0]} maxBarSize={24}/>
+                <Bar dataKey="exp" fill="#f97066" radius={[4,4,0,0]} maxBarSize={24}/>
+              </BarChart>
+            </ResponsiveContainer>
+            <div style={{display:"flex",gap:16,justifyContent:"center",marginTop:4}}>
+              {[["#4fd1a5","Pemasukan"],["#f97066","Pengeluaran"]].map(([c,l])=>(
+                <span key={l} style={{fontSize:11,color:"#8884a8",display:"flex",alignItems:"center",gap:4}}>
+                  <span style={{width:10,height:10,background:c,borderRadius:2,display:"inline-block"}}/>
+                  {l}
+                </span>
+              ))}
+            </div>
+          </>
+        }
       </div>
-      <p style={S.sectionTitle}>Pengeluaran per Kategori</p>
+
+      <p style={S.sectionTitle}>Pengeluaran Bulan Ini per Kategori</p>
       <div style={S.card}>
         {sorted.length===0
-          ? <div style={{color:"#8884a8",fontSize:13}}>Belum ada pengeluaran</div>
+          ? <div style={{color:"#8884a8",fontSize:13}}>Belum ada pengeluaran bulan ini.</div>
           : sorted.map(([name,amt])=>(
             <div key={name} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
               <div style={{fontSize:13,width:110,flexShrink:0}}>{CAT_EMOJI[name]} {name}</div>
@@ -270,7 +301,7 @@ function ChartView({ txs }) {
           ))
         }
       </div>
-      <button style={S.exportBtn} onClick={exportTxt}><FileText size={16}/> Export Ringkasan</button>
+      <button style={S.exportBtn} onClick={exportTxt}><FileText size={16}/> Export Bulan Ini</button>
     </>
   );
 }
@@ -315,15 +346,17 @@ function SavingView({ savings, loading, onAdd }) {
 function AiView({ txs, savings }) {
   const [tip, setTip] = useState("");
   const [loading, setLoading] = useState(false);
+  const thisTxs = currentMonthTxs(txs);
 
   const getTip = async () => {
-    const inc = txs.filter(t=>t.type==="income").reduce((a,t)=>a+t.amount,0);
-    const exp = txs.filter(t=>t.type==="expense").reduce((a,t)=>a+t.amount,0);
+    const inc = thisTxs.filter(t=>t.type==="income").reduce((a,t)=>a+t.amount,0);
+    const exp = thisTxs.filter(t=>t.type==="expense").reduce((a,t)=>a+t.amount,0);
     const cats = {};
-    txs.filter(t=>t.type==="expense").forEach(t=>{ cats[t.cat]=(cats[t.cat]||0)+t.amount; });
+    thisTxs.filter(t=>t.type==="expense").forEach(t=>{ cats[t.cat]=(cats[t.cat]||0)+t.amount; });
     const topCat = Object.entries(cats).sort((a,b)=>b[1]-a[1])[0];
     const goals = savings.map(s=>`${s.emoji} ${s.name}: ${Math.round(s.current/s.target*100)}% terpenuhi`).join(", ");
-    const prompt = `Kamu adalah asisten keuangan personal untuk mahasiswa/anak kos Indonesia. Berikan tips keuangan yang singkat, praktis, dan relevan berdasarkan data ini:\n\n- Pemasukan bulan ini: Rp ${Math.round(inc).toLocaleString("id-ID")}\n- Pengeluaran bulan ini: Rp ${Math.round(exp).toLocaleString("id-ID")}\n- Saldo: Rp ${Math.round(inc-exp).toLocaleString("id-ID")}\n- Pengeluaran terbesar: ${topCat?topCat[0]+" (Rp "+Math.round(topCat[1]).toLocaleString("id-ID")+")":"belum ada data"}\n- Target tabungan: ${goals||"belum ada"}\n\nBerikan 2-3 tips konkret dalam Bahasa Indonesia. Santai tapi informatif. Sertakan emoji. Maksimal 120 kata.`;
+    const now = new Date();
+    const prompt = `Kamu adalah asisten keuangan personal untuk mahasiswa/anak kos Indonesia. Berikan tips keuangan yang singkat, praktis, dan relevan berdasarkan data bulan ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()} ini:\n\n- Pemasukan: Rp ${Math.round(inc).toLocaleString("id-ID")}\n- Pengeluaran: Rp ${Math.round(exp).toLocaleString("id-ID")}\n- Saldo: Rp ${Math.round(inc-exp).toLocaleString("id-ID")}\n- Pengeluaran terbesar: ${topCat?topCat[0]+" (Rp "+Math.round(topCat[1]).toLocaleString("id-ID")+")":"belum ada data"}\n- Target tabungan: ${goals||"belum ada"}\n\nBerikan 2-3 tips konkret dalam Bahasa Indonesia. Santai tapi informatif. Sertakan emoji. Maksimal 120 kata.`;
     setLoading(true); setTip("");
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -350,7 +383,7 @@ function AiView({ txs, savings }) {
             </div>
           : tip
             ? <div style={{fontSize:13,lineHeight:1.7,whiteSpace:"pre-wrap"}}>{tip}</div>
-            : <div style={{fontSize:13,color:"#8884a8"}}>Klik tombol di bawah untuk mendapatkan tips personal.</div>
+            : <div style={{fontSize:13,color:"#8884a8"}}>Klik tombol di bawah untuk mendapatkan tips personal bulan ini.</div>
         }
         <button style={S.aiBtn} onClick={getTip} disabled={loading}>
           ✨ {tip?"Refresh Tips":"Analisis & Beri Tips"}
@@ -396,6 +429,11 @@ export default function App() {
     if (data) setTxs(prev=>[data[0],...prev]);
   };
 
+  const deleteTx = async (id) => {
+    await supabase.from("transactions").delete().eq("id", id);
+    setTxs(prev => prev.filter(t => t.id !== id));
+  };
+
   const addSaving = async (sv) => {
     const { data } = await supabase.from("savings").insert([sv]).select();
     if (data) setSavings(prev=>[...prev,data[0]]);
@@ -416,10 +454,10 @@ export default function App() {
           <div style={S.logoDot}><Wallet size={16} color="#fff"/></div>
           KosWallet
         </div>
-        <div style={{fontSize:12,color:"#8884a8"}}>Mei 2025</div>
+        <div style={{fontSize:12,color:"#8884a8"}}>{MONTH_NAMES[new Date().getMonth()]} {new Date().getFullYear()}</div>
       </header>
       <main style={S.body}>
-        {tab==="home"   && <HomeView   txs={txs} loading={loadingTx} onAdd={()=>setShowTxModal(true)}/>}
+        {tab==="home"   && <HomeView   txs={txs} loading={loadingTx} onAdd={()=>setShowTxModal(true)} onDelete={deleteTx}/>}
         {tab==="chart"  && <ChartView  txs={txs}/>}
         {tab==="saving" && <SavingView savings={savings} loading={loadingSv} onAdd={()=>setShowSvModal(true)}/>}
         {tab==="ai"     && <AiView     txs={txs} savings={savings}/>}
