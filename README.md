@@ -1,16 +1,55 @@
-# React + Vite
+# 🚀 React + Vite
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Selamat datang di project React + Vite ini!  
+Project ini dibuat untuk membantu proses pengembangan aplikasi React menjadi lebih cepat, ringan, dan modern ⚡
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## ✨ Teknologi yang Digunakan
 
-## React Compiler
+Project ini menggunakan beberapa teknologi berikut:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- ⚛️ React — Library JavaScript untuk membangun User Interface
+- ⚡ Vite — Build tool modern dengan performa super cepat
+- 🔥 HMR (Hot Module Replacement) — Perubahan kode langsung terlihat tanpa reload penuh
+- ✅ ESLint — Membantu menjaga kualitas dan konsistensi kode
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## 📦 Plugin React yang Tersedia
+
+Saat ini terdapat dua plugin resmi yang bisa digunakan:
+
+### 1. `@vitejs/plugin-react`
+Menggunakan **Oxc** sebagai compiler.
+
+### 2. `@vitejs/plugin-react-swc`
+Menggunakan **SWC** yang terkenal lebih cepat untuk proses build dan development.
+
+---
+
+## 🧠 React Compiler
+
+React Compiler belum diaktifkan karena dapat memengaruhi performa saat development maupun build project.
+
+Jika ingin menggunakannya, kamu bisa melihat dokumentasi resmi React Compiler.
+
+---
+
+## 🛠️ ESLint Configuration
+
+Untuk project skala production, disarankan menggunakan:
+
+- TypeScript
+- Type-aware lint rules
+- `typescript-eslint`
+
+Agar kode lebih aman, rapi, dan mudah dikelola.
+
+---
+
+## ▶️ Cara Menjalankan Project
+
+### Install Dependency
+```bash
+npm install
